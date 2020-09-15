@@ -1,8 +1,8 @@
+const delay = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class Rpc {
-    public static readonly DefaultConnectionTimeoutMs = 3000;
+    public static readonly DefaultConnectionTimeoutMs = 1618;
     public static readonly DefaultMessageTimeoutMs = 1500;
-    public static readonly HeartbeatIntervalMs = 1234;
     public static readonly ConnectionBackoffExponent = 2;
     public static readonly ErrorCodes: { [errorName: string]: RpcErrorCode } = {
         PARSE_ERROR: -32700,
@@ -26,7 +26,7 @@ export class Rpc {
 
     // TODO @jonas: heartbeat
     private latencyMs = 0;
-    
+
     private ws: WebSocket | undefined;
 
     private _isDisposed = false;
@@ -56,6 +56,31 @@ export class Rpc {
 
         this.connectionTimeoutMs = connectionTimeoutMs;
         this.messageTimeoutMs = messageTimeoutMs;
+
+        const heartbeat = (() => {
+            let nextTimeout = Rpc.DefaultConnectionTimeoutMs;
+            return async () => {
+                for (; ;) {
+                    if (this._isDisposed) {
+                        break
+                    }
+                    try {
+                        await this.connect();
+                        // rest timeout on successful connection
+                        nextTimeout = Rpc.DefaultConnectionTimeoutMs;
+                    } catch (e) {
+                        if (e instanceof ConnectionError) {
+                            nextTimeout = Rpc.ConnectionBackoffExponent * nextTimeout;
+                        }
+                    }
+                    await delay(nextTimeout);
+                }
+            }
+        })();
+        heartbeat();
+
+        // TODO @jonas: some bug in firefox needs this workaround?
+        window.addEventListener('beforeunload', () => this.ws && this.ws.close());
     }
 
     /**
@@ -152,6 +177,11 @@ export class Rpc {
         return this.subscribers[topic].id
     }
 
+    public dispose = () => {
+        this._isDisposed = true;
+        this.ws?.close(1000, "user closed connection");
+    };
+
     /**
      * Private
      */
@@ -174,10 +204,16 @@ export class Rpc {
                             this.resubscribe();
                             resolve(this.ws);
                         };
+                        this.ws.onclose = () => {
+                            this.ws?.close(1000, 'remote socket closed')
+                        }
 
                         setTimeout(() => {
                             currentConnectionPromise = undefined;
-                            reject(new ConnectionError(`connection to ${this.uri} timed out`));
+                            if (!this.ws || this.ws.readyState === WebSocket.CONNECTING) {
+                                this.ws = undefined;
+                                reject(new ConnectionError(`connection to ${this.uri} timed out`));
+                            }
                         }, this.connectionTimeoutMs);
                     } else {
                         setTimeout(() => {

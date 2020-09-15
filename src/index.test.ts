@@ -17,6 +17,7 @@ test('should make a successful call request', async () => {
         params: {}
     })
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -38,6 +39,7 @@ test('should fail invalid call request', async () => {
 
     await res.catch((e) => { expect(e).toBeInstanceOf(ProtocolError) })
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -59,6 +61,7 @@ test('should handle call request response', async () => {
     const sm = await res
     expect(sm).toMatchObject({ jobId: cm.jobId, result: 'res' })
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -79,6 +82,7 @@ test('should handle multiple call requests', async () => {
     const sm1 = await res1
     expect(sm1).toMatchObject({ jobId: cm1.jobId, result: 'echo1' })
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -97,6 +101,7 @@ test('should make a successful call request with parameters', async () => {
         params: p
     })
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -118,6 +123,7 @@ test('should make a successful stream subscription', async () => {
     const id = await streamResp
     expect(id).toEqual(m.jobId)
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -140,6 +146,7 @@ test('should setup multiple stream subscriptions', async () => {
 
     expect(id0).not.toEqual(id1)
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -160,6 +167,7 @@ test('should reuse stream subscription id', async () => {
 
     expect(id0).toEqual(id1)
 
+    client.dispose();
     return MockWS.clean();
 })
 
@@ -183,5 +191,32 @@ test('should publish stream update', async () => {
     const updateMessage = await streamUpdate
     expect(updateMessage).toEqual('update')
 
+    client.dispose();
+    return MockWS.clean();
+})
+
+test('should reconnect after server down', async () => {
+    jest.setTimeout(10000)
+
+    const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
+    const client = new Rpc({ uri: 'ws://localhost:7357' })
+
+    server.close();
+
+    await delay(1300)
+
+    const server2 = new MockWS('ws://localhost:7357', { jsonProtocol: true })
+
+    client.call('test')
+
+    const m = await server2.nextMessage;
+    expect(m).toMatchObject({
+        jsonrpc: '2.0',
+        type: 'CALL',
+        method: 'test',
+        params: {}
+    })
+
+    client.dispose();
     return MockWS.clean();
 })
