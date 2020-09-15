@@ -1,3 +1,4 @@
+
 export class Rpc {
     public static readonly DefaultConnectionTimeoutMs = 3000;
     public static readonly DefaultMessageTimeoutMs = 1500;
@@ -127,7 +128,7 @@ export class Rpc {
     public call = (method: string, params: { [key: string]: JsonValue } = {}) =>
         this.send("CALL", method, params)
 
-    public stream = async (method: string, params: { [key: string]: JsonValue }, callback: (value: JsonValue) => void) => {
+    public stream = async (method: string, params: { [key: string]: JsonValue }, callback: (value: JsonValue) => void): Promise<UUIDV4> => {
         const topic = `${method}_${JSON.stringify(params)}`
         if (!this.subscribers[topic]) {
             const res = await this.send("STREAM", method, params)
@@ -297,7 +298,7 @@ export interface MFJsonRpcReply {
 
     error: MFJsonRpcError
 }
-type MFJsonRpcResponse = MFJsonRpcReply | MFJsonRpcReply[]
+export type MFJsonRpcResponse = MFJsonRpcReply | MFJsonRpcReply[]
 
 export class ConnectionError extends Error {
     constructor(msg: string) {

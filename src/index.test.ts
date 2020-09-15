@@ -20,7 +20,7 @@ test('should make a successful call request', async () => {
     return MockWS.clean();
 })
 
-test.only('should fail invalid call request', async () => {
+test('should fail invalid call request', async () => {
     const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
     const client = new Rpc({ uri: 'ws://localhost:7357' })
 
