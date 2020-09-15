@@ -220,3 +220,38 @@ test('should reconnect after server down', async () => {
     client.dispose();
     return MockWS.clean();
 })
+
+test('should resubscribe after server down', async () => {
+    jest.setTimeout(10000)
+
+    const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
+    const client = new Rpc({ uri: 'ws://localhost:7357' })
+
+    const streamUpdate = new Promise(r => {
+        client.stream('test', {}, update => {
+            r(update)
+        })
+    })
+
+    const m = await server.nextMessage as MFJsonRpcAction;
+    server.send({ jobId: m.jobId, result: 'successful stream subscription', header: {} })
+
+    server.close()
+
+    await delay(1300)
+
+    const server2 = new MockWS('ws://localhost:7357', { jsonProtocol: true })
+
+    const m2 = await server2.nextMessage as MFJsonRpcAction;
+    server.send({ jobId: m2.jobId, result: 'successful stream subscription', header: {} })
+
+    await delay(300)
+
+    server2.send({ jobId: m.jobId, result: 'update', header: {} })
+
+    const updateMessage = await streamUpdate
+    expect(updateMessage).toEqual('update')
+
+    client.dispose();
+    return MockWS.clean();
+})

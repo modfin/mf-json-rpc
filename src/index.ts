@@ -100,13 +100,12 @@ export class Rpc {
             }
 
             if (!!customId) {
-                if (isUuidV4(customId)) {
+                if (!isUuidV4(customId)) {
                     throw new TypeError("customId must be a valid uuidV4 if supplied")
                 }
                 if (this.inFlightRequests[customId]) {
                     throw new TransportError("customId cannot equal an already in-flight request id");
                 }
-
                 usedCustomIds.add(customId);
             }
 
@@ -114,6 +113,7 @@ export class Rpc {
             while (usedCustomIds.has(nextId)) {
                 nextId = uuidV4();
             }
+
             const requestId = !!customId
                 ? customId
                 : nextId;
@@ -161,6 +161,7 @@ export class Rpc {
             // looks ugly but I think it's better than alternatives
             if (!this.subscribers[topic]) {
                 this.subscribers[topic] = {
+                    method: method,
                     callbacks: [],
                     id: res instanceof Array
                         ? res[0].jobId
@@ -263,8 +264,8 @@ export class Rpc {
     }
 
     private resubscribe = () => {
-        Object.entries(this.subscribers).forEach(([method, sub]) => {
-            this.send("STREAM", method, sub.params ?? {}, sub.id);
+        Object.values(this.subscribers).forEach((sub) => {
+            this.send("STREAM", sub.method, sub.params ?? {}, sub.id);
         })
     }
 }
@@ -302,6 +303,7 @@ interface RequestResolver {
 
 interface Subscriber {
     id: string,
+    method: string,
     params: { [key: string]: JsonValue },
     callbacks: ((value: JsonValue) => void)[]
 }
