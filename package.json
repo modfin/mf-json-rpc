@@ -3,6 +3,10 @@
   "version": "0.0.2",
   "description": "websocket implementation of json-rpc as used at modular finance",
   "main": "src/index.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modfin/mf-json-rpc"
+  },
   "scripts": {
     "test": "jest",
     "publish": "npm publish --access public"
