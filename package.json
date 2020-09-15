@@ -1,10 +1,11 @@
 {
-  "name": "mf-json-rpc",
+  "name": "@modfin/mf-json-rpc",
   "version": "0.0.1",
   "description": "websocket implementation of json-rpc as used at modular finance",
   "main": "src/index.ts",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "rpc",
