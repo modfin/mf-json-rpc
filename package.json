@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "jest",
-    "publish": "npm publish --access public"
+    "release": "npm run build && npm publish --access public",
+    "build": "tsc"
   },
   "keywords": [
     "rpc",
