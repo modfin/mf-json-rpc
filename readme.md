@@ -3,7 +3,7 @@
 ### Install
 
 ```
-npm i mf-json-rpc
+npm i @modfin/mf-json-rpc
 ```
 
 ### Call (standard request/response)
