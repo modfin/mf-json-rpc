@@ -37,7 +37,7 @@ export class Rpc {
         connectionTimeoutMs = Rpc.DefaultConnectionTimeoutMs,
         messageTimeoutMs = Rpc.DefaultMessageTimeoutMs
     }: {
-        uri: string
+        uri: string,
         connectionTimeoutMs?: number
         messageTimeoutMs?: number
     }) {
@@ -46,12 +46,14 @@ export class Rpc {
         }
 
         const protocolRx = /^.*:\/\//
-        const wsProtocol = window && window.location.protocol === 'https:'
+        const specifiedProtocol = uri.match(/^(wss?:\/\/)/)?.[1]
+
+        const wsProtocol = window?.location?.protocol === 'https:'
             ? 'wss://'
             : 'ws://';
 
         this.uri = uri.match(protocolRx)
-            ? uri.replace(protocolRx, wsProtocol)
+            ? uri.replace(protocolRx, specifiedProtocol ?? wsProtocol)
             : `${wsProtocol}${uri}`;
 
         this.connectionTimeoutMs = connectionTimeoutMs;
@@ -377,7 +379,7 @@ export class TransportError extends Error {
 
 export class ProtocolError extends Error {
     public code: RpcErrorCode;
-    public data?: JsonValue; 
+    public data?: JsonValue;
     constructor(msg: string, code = Rpc.ErrorCodes.INTERNAL_ERROR, data: JsonValue | undefined) {
         super(msg);
         this.code = code;
