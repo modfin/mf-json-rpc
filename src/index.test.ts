@@ -31,13 +31,22 @@ test('should fail invalid call request', async () => {
     server.send({
         jobId: cm.jobId,
         result: null,
+        header: {},
         error: {
             code: Rpc.ErrorCodes.METHOD_NOT_FOUND,
-            message: 'method not found'
+            message: 'method not found',
+            data: { some: ['structured'], data: 1 }
         }
     } as MFJsonRpcReply)
 
-    await res.catch((e) => { expect(e).toBeInstanceOf(ProtocolError) })
+    await res.catch((e) => {
+        expect(e).toBeInstanceOf(ProtocolError)
+        expect(e).toMatchObject({
+            code: Rpc.ErrorCodes.METHOD_NOT_FOUND,
+            message: 'method not found',
+            data: { some: ['structured'], data: 1 }
+        })
+    })
 
     client.dispose();
     return MockWS.clean();

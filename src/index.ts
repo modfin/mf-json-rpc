@@ -248,7 +248,7 @@ export class Rpc {
                 batchedMessages.forEach(message => {
                     if (message.error) {
                         if (this.inFlightRequests[message.jobId]) {
-                            const err = new ProtocolError(message.error.message, message.error.code)
+                            const err = new ProtocolError(message.error.message, message.error.code, message.error.data)
                             this.inFlightRequests[message.jobId].reject(err);
                         } else {
                             // TODO @jonas: may want to handle subscription fail/finish callback
@@ -262,7 +262,7 @@ export class Rpc {
                             this.notify(message.jobId, message.result);
                         }
                     } else {
-                        throw new ProtocolError(`Message does not seem to follow protocol, message = ${message}`, Rpc.ErrorCodes.INTERNAL_ERROR);
+                        throw new ProtocolError(`Message does not seem to follow protocol, message = ${message}`, Rpc.ErrorCodes.INTERNAL_ERROR, null);
                     }
                 })
             } catch (e) {
@@ -344,7 +344,7 @@ type MFJsonRpcRequest = MFJsonRpcAction | MFJsonRpcAction[]
 interface MFJsonRpcError {
     code: RpcErrorCode
     message: string
-    data: JsonValue
+    data?: JsonValue
 }
 export interface MFJsonRpcReply {
     // note @jonas: server implementation is missing `jsonrpc: '2.0'` param
@@ -376,10 +376,12 @@ export class TransportError extends Error {
 }
 
 export class ProtocolError extends Error {
-    private code: RpcErrorCode;
-    constructor(msg: string, code = Rpc.ErrorCodes.INTERNAL_ERROR) {
+    public code: RpcErrorCode;
+    public data?: JsonValue; 
+    constructor(msg: string, code = Rpc.ErrorCodes.INTERNAL_ERROR, data: JsonValue | undefined) {
         super(msg);
         this.code = code;
+        this.data = data;
         Object.setPrototypeOf(this, ProtocolError.prototype);
     }
 }
