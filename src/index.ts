@@ -82,7 +82,7 @@ export class Rpc {
         heartbeat();
 
         // TODO @jonas: some bug in firefox needs this workaround?
-        window.addEventListener('beforeunload', () => this.ws && this.ws.close());
+        window?.addEventListener('beforeunload', () => this.ws && this.ws.close());
     }
 
     /**
