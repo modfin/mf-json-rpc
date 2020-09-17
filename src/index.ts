@@ -92,21 +92,24 @@ export class Rpc {
         return async (
             type: "CALL" | "STREAM",
             method: string,
-            params?: { [key: string]: JsonValue },
-            customId?: string
+            opts: {
+                params?: { [key: string]: JsonValue },
+                headers?: { [key: string]: string },
+                customId?: string
+            } = {}
         ) => {
             if (this._isDisposed) {
                 throw new ConnectionError("This Rpc has been disposed, create a new one to send messages");
             }
 
-            if (!!customId) {
-                if (!isUuidV4(customId)) {
-                    throw new TypeError("customId must be a valid uuidV4 if supplied")
+            if (!!opts.customId) {
+                if (!isUuidV4(opts.customId)) {
+                    throw new TypeError("opts.customId must be a valid uuidV4 if supplied")
                 }
-                if (this.inFlightRequests[customId]) {
-                    throw new TransportError("customId cannot equal an already in-flight request id");
+                if (this.inFlightRequests[opts.customId]) {
+                    throw new TransportError("opts.customId cannot equal an already in-flight request id");
                 }
-                usedCustomIds.add(customId);
+                usedCustomIds.add(opts.customId);
             }
 
             let nextId = uuidV4();
@@ -114,8 +117,8 @@ export class Rpc {
                 nextId = uuidV4();
             }
 
-            const requestId = !!customId
-                ? customId
+            const requestId = !!opts.customId
+                ? opts.customId
                 : nextId;
 
             const msg: MFJsonRpcRequest = {
@@ -123,8 +126,11 @@ export class Rpc {
                 type: type,
                 method: method,
                 jobId: requestId,
-                params: params ?? {},
-                header: { sessionId: this._sessionId }
+                params: opts.params ?? {},
+                header: {
+                    sessionId: this._sessionId,
+                    ...(opts.headers || {})
+                }
             };
             const jsonMsg = JSON.stringify(msg) // will also throw, but has well typed error
 
@@ -150,13 +156,18 @@ export class Rpc {
         }
     })();
 
-    public call = (method: string, params: { [key: string]: JsonValue } = {}) =>
-        this.send("CALL", method, params)
+    public call = (method: string, params: { [key: string]: JsonValue } = {}, options?: { headers?: { [key: string]: string } }) =>
+        this.send("CALL", method, { params, headers: options?.headers })
 
-    public stream = async (method: string, params: { [key: string]: JsonValue }, callback: (value: JsonValue) => void): Promise<UUIDV4> => {
+    public stream = async (
+        method: string,
+        params: { [key: string]: JsonValue },
+        callback: (value: JsonValue) => void,
+        options?: { headers?: { [key: string]: string } }
+    ): Promise<UUIDV4> => {
         const topic = `${method}_${JSON.stringify(params)}`
         if (!this.subscribers[topic]) {
-            const res = await this.send("STREAM", method, params)
+            const res = await this.send("STREAM", method, { params, headers: options?.headers })
             // bit of a special race condition case here
             // looks ugly but I think it's better than alternatives
             if (!this.subscribers[topic]) {
@@ -166,7 +177,8 @@ export class Rpc {
                     id: res instanceof Array
                         ? res[0].jobId
                         : res.jobId,
-                    params: params
+                    params: params,
+                    options: options
                 }
             }
         }
@@ -239,6 +251,8 @@ export class Rpc {
                             const err = new ProtocolError(message.error.message, message.error.code)
                             this.inFlightRequests[message.jobId].reject(err);
                         } else {
+                            // TODO @jonas: may want to handle subscription fail/finish callback
+                            // differently in the future
                             console.error(`received erroneous rpc message, message = ${event.data}`);
                         }
                     } else if (message.hasOwnProperty('result')) {
@@ -265,7 +279,13 @@ export class Rpc {
 
     private resubscribe = () => {
         Object.values(this.subscribers).forEach((sub) => {
-            this.send("STREAM", sub.method, sub.params ?? {}, sub.id);
+            this.send(
+                "STREAM",
+                sub.method, {
+                params: sub.params,
+                headers: sub.options?.headers,
+                customId: sub.id
+            });
         })
     }
 }
@@ -305,7 +325,10 @@ interface Subscriber {
     id: string,
     method: string,
     params: { [key: string]: JsonValue },
-    callbacks: ((value: JsonValue) => void)[]
+    callbacks: ((value: JsonValue) => void)[],
+    options?: {
+        headers?: { [key: string]: string }
+    }
 }
 
 export interface MFJsonRpcAction {

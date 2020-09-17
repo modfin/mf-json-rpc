@@ -43,6 +43,25 @@ test('should fail invalid call request', async () => {
     return MockWS.clean();
 })
 
+test('should support header field in call', async () => {
+    const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
+    const client = new Rpc({ uri: 'ws://localhost:7357' })
+
+    client.call('test', {}, { headers: { 'TestHeaderKey': 'TestHeaderValue' } })
+
+    const m = await server.nextMessage;
+    expect(m).toMatchObject({
+        jsonrpc: '2.0',
+        type: 'CALL',
+        method: 'test',
+        params: {},
+        header: { 'TestHeaderKey': 'TestHeaderValue' }
+    })
+
+    client.dispose();
+    return MockWS.clean();
+})
+
 test('should handle call request response', async () => {
     const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
     const client = new Rpc({ uri: 'ws://localhost:7357' })
@@ -117,6 +136,29 @@ test('should make a successful stream subscription', async () => {
         type: 'STREAM',
         method: 'test',
         params: {}
+    })
+    server.send({ jobId: m.jobId, result: 'successful stream subscription', header: {} })
+
+    const id = await streamResp
+    expect(id).toEqual(m.jobId)
+
+    client.dispose();
+    return MockWS.clean();
+})
+
+test('should support header field in stream', async () => {
+    const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
+    const client = new Rpc({ uri: 'ws://localhost:7357' })
+
+    const streamResp = client.stream('test', {}, () => { }, { headers: { 'TestHeaderKey': 'TestHeaderValue' } })
+
+    const m = await server.nextMessage as MFJsonRpcAction;
+    expect(m).toMatchObject({
+        jsonrpc: '2.0',
+        type: 'STREAM',
+        method: 'test',
+        params: {},
+        header: { 'TestHeaderKey': 'TestHeaderValue' }
     })
     server.send({ jobId: m.jobId, result: 'successful stream subscription', header: {} })
 

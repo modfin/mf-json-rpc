@@ -29,3 +29,20 @@ client.stream('method_with_stream_support', { optional: 'params' }, update => {
     updates = [...updates, update]
 })
 ```
+
+### Options
+
+```javascript
+const client = new Rpc({ uri: 'ws://localhost:7357' })
+const res = await client.call(
+    'method',
+    { optional: 'params' },
+    { headers: { Authorization: authToken } }
+)
+client.stream(
+    'method_with_stream_support',
+    { optional: 'params' },
+    update => { updates = [...updates, update] },
+    { headers: { Authorization: authToken } }
+)
+```
