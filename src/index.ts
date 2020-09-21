@@ -22,7 +22,7 @@ export class Rpc {
     private messageTimeoutMs: number;
 
     private inFlightRequests: { [requestId: string]: RequestResolver } = {};
-    private subscribers: { [topic: string]: Subscriber } = {};
+    private subscribers: { [subKey: string]: Subscriber } = {};
 
     // TODO @jonas: heartbeat
     private latencyMs = 0;
@@ -44,11 +44,10 @@ export class Rpc {
         if (typeof uri !== 'string' || !uri) {
             throw new TypeError(NO_URI_ERROR)
         }
-
         const protocolRx = /^.*:\/\//
         const specifiedProtocol = uri.match(/^(wss?:\/\/)/)?.[1]
 
-        const wsProtocol = window?.location?.protocol === 'https:'
+        const wsProtocol = window?.location?.protocol === 'https:' || !!uri.match(/^(https:\/\/)/)
             ? 'wss://'
             : 'ws://';
 
@@ -82,7 +81,7 @@ export class Rpc {
         heartbeat();
 
         // TODO @jonas: some bug in firefox needs this workaround?
-        window?.addEventListener('beforeunload', () => this.ws && this.ws.close());
+        window?.addEventListener && window.addEventListener('beforeunload', () => this.ws && this.ws.close());
     }
 
     /**
@@ -95,7 +94,7 @@ export class Rpc {
             type: "CALL" | "STREAM",
             method: string,
             opts: {
-                params?: { [key: string]: JsonValue },
+                params?: JsonValue,
                 headers?: { [key: string]: string },
                 customId?: string
             } = {}
@@ -163,17 +162,24 @@ export class Rpc {
 
     public stream = async (
         method: string,
-        params: { [key: string]: JsonValue },
+        params: JsonValue,
         callback: (value: JsonValue) => void,
-        options?: { headers?: { [key: string]: string } }
+        options?: {
+            headers?: { [key: string]: string }
+            idempotenceKey?: string
+        }
     ): Promise<UUIDV4> => {
-        const topic = `${method}_${JSON.stringify(params)}`
-        if (!this.subscribers[topic]) {
+        const subscriptionKey = options?.idempotenceKey ?? `${method}_${JSON.stringify(params)}`
+        if (this.subscribers[subscriptionKey]?.callbacks.length > 0 && options?.idempotenceKey) {
+            return this.subscribers[subscriptionKey].id
+        }
+
+        if (!this.subscribers[subscriptionKey]) {
             const res = await this.send("STREAM", method, { params, headers: options?.headers })
             // bit of a special race condition case here
             // looks ugly but I think it's better than alternatives
-            if (!this.subscribers[topic]) {
-                this.subscribers[topic] = {
+            if (!this.subscribers[subscriptionKey]) {
+                this.subscribers[subscriptionKey] = {
                     method: method,
                     callbacks: [],
                     id: res instanceof Array
@@ -185,11 +191,11 @@ export class Rpc {
             }
         }
 
-        if (!this.subscribers[topic].callbacks.includes(callback)) {
-            this.subscribers[topic].callbacks.push(callback);
+        if (!this.subscribers[subscriptionKey].callbacks.includes(callback)) {
+            this.subscribers[subscriptionKey].callbacks.push(callback);
         }
 
-        return this.subscribers[topic].id
+        return this.subscribers[subscriptionKey].id
     }
 
     public dispose = () => {
@@ -212,7 +218,7 @@ export class Rpc {
                     ) {
                         this.ws = new WebSocket(this.uri);
                         this.ws.onerror = event =>
-                            reject(new ConnectionError(`Could not connect to server, error event ${event}`));
+                            reject(new ConnectionError(`Could not connect to server, error event ${JSON.stringify(event)}`));
                         this.ws.onmessage = this.getMessageHandler();
                         this.ws.onopen = () => {
                             currentConnectionPromise = undefined;
@@ -326,7 +332,7 @@ interface RequestResolver {
 interface Subscriber {
     id: string,
     method: string,
-    params: { [key: string]: JsonValue },
+    params: JsonValue,
     callbacks: ((value: JsonValue) => void)[],
     options?: {
         headers?: { [key: string]: string }
@@ -338,7 +344,7 @@ export interface MFJsonRpcAction {
     jobId: string,
     type: "CALL" | "STREAM",
     method: string,
-    params: { [key: string]: JsonValue }
+    params: JsonValue
     header?: { [key: string]: string }
 }
 type MFJsonRpcRequest = MFJsonRpcAction | MFJsonRpcAction[]
