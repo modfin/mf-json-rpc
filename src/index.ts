@@ -170,7 +170,9 @@ export class Rpc {
         }
     ): Promise<UUIDV4> => {
         const subscriptionKey = options?.idempotenceKey ?? `${method}_${JSON.stringify(params)}`
-        if (this.subscribers[subscriptionKey]?.callbacks.length > 0 && options?.idempotenceKey) {
+
+        if (!!this.subscribers[subscriptionKey] && options?.idempotenceKey) {
+            this.subscribers[subscriptionKey].callbacks = [callback]
             return this.subscribers[subscriptionKey].id
         }
 
@@ -191,7 +193,9 @@ export class Rpc {
             }
         }
 
-        if (!this.subscribers[subscriptionKey].callbacks.includes(callback)) {
+        if (!!options?.idempotenceKey) {
+            this.subscribers[subscriptionKey].callbacks = [callback];
+        } else if (!this.subscribers[subscriptionKey].callbacks.includes(callback)) {
             this.subscribers[subscriptionKey].callbacks.push(callback);
         }
 
