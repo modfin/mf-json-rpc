@@ -171,32 +171,20 @@ export class Rpc {
     ): Promise<UUIDV4> => {
         const subscriptionKey = options?.idempotenceKey ?? `${method}_${JSON.stringify(params)}`
 
-        if (!!this.subscribers[subscriptionKey] && options?.idempotenceKey) {
-            this.subscribers[subscriptionKey].callbacks = [callback]
-            return this.subscribers[subscriptionKey].id
-        }
-
-        if (!this.subscribers[subscriptionKey]) {
-            const res = await this.send("STREAM", method, { params, headers: options?.headers })
-            // bit of a special race condition case here
-            // looks ugly but I think it's better than alternatives
-            if (!this.subscribers[subscriptionKey]) {
-                this.subscribers[subscriptionKey] = {
-                    method: method,
-                    callbacks: [],
-                    id: res instanceof Array
-                        ? res[0].jobId
-                        : res.jobId,
-                    params: params,
-                    options: options
-                }
-            }
-        }
-
-        if (!!options?.idempotenceKey) {
-            this.subscribers[subscriptionKey].callbacks = [callback];
-        } else if (!this.subscribers[subscriptionKey].callbacks.includes(callback)) {
-            this.subscribers[subscriptionKey].callbacks.push(callback);
+        const res = await this.send("STREAM", method, { params, headers: options?.headers })
+        this.subscribers[subscriptionKey] = {
+            method: method,
+            callbacks: [
+                ...(options?.idempotenceKey
+                    ? []
+                    : (this.subscribers[subscriptionKey]?.callbacks || [])),
+                callback
+            ],
+            id: res instanceof Array
+                ? res[0].jobId
+                : res.jobId,
+            params: params,
+            options: options
         }
 
         return this.subscribers[subscriptionKey].id
@@ -278,7 +266,7 @@ export class Rpc {
                     }
                 })
             } catch (e) {
-                console.error(`Rpc could not handle incoming message = ${event}, error = ${e}`);
+                console.error(`Rpc could not handle incoming event = ${JSON.stringify(event)}, error = ${e}`);
             }
         }
     }

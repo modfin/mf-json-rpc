@@ -201,27 +201,6 @@ test('should setup multiple stream subscriptions', async () => {
     return MockWS.clean();
 })
 
-test('should reuse stream subscription id', async () => {
-    const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
-    const client = new Rpc({ uri: 'ws://localhost:7357' })
-
-    const streamResp0 = client.stream('test', {}, () => { })
-    const streamResp1 = client.stream('test', {}, () => { })
-
-    const m0 = await server.nextMessage as MFJsonRpcAction;
-    server.send({ jobId: m0.jobId, result: 'successful stream subscription', header: {} })
-    const m1 = await server.nextMessage as MFJsonRpcAction;
-    server.send({ jobId: m1.jobId, result: 'successful stream subscription', header: {} })
-
-    const id0 = await streamResp0
-    const id1 = await streamResp1
-
-    expect(id0).toEqual(id1)
-
-    client.dispose();
-    return MockWS.clean();
-})
-
 test('should publish stream update', async () => {
     const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
     const client = new Rpc({ uri: 'ws://localhost:7357' })
