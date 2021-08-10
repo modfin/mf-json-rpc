@@ -1,4 +1,8 @@
-import { Rpc, MFJsonRpcAction, MFJsonRpcReply, ProtocolError } from './index'
+/**
+ * @jest-environment jsdom
+ */
+
+import { Rpc, MFJsonRpcAction, ProtocolError, MFJsonRpcResponse } from './index'
 import MockWS from "jest-websocket-mock";
 
 const delay = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,7 +41,7 @@ test('should fail invalid call request', async () => {
             message: 'method not found',
             data: { some: ['structured'], data: 1 }
         }
-    } as MFJsonRpcReply)
+    } as MFJsonRpcResponse<null>)
 
     await res.catch((e) => {
         expect(e).toBeInstanceOf(ProtocolError)
@@ -84,7 +88,7 @@ test('should handle call request response', async () => {
         method: 'test',
         params: {}
     })
-    server.send({ jobId: cm.jobId, result: 'res' } as MFJsonRpcReply)
+    server.send({ jobId: cm.jobId, result: 'res' })
 
     const sm = await res
     expect(sm).toMatchObject({ jobId: cm.jobId, result: 'res' })
@@ -97,13 +101,13 @@ test('should handle multiple call requests', async () => {
     const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
     const client = new Rpc({ uri: 'ws://localhost:7357' })
 
-    const res0 = client.call('echo0')
-    const res1 = client.call('echo1')
+    const res0 = client.call<string>('echo0')
+    const res1 = client.call<string>('echo1')
 
     const cm0 = await server.nextMessage as MFJsonRpcAction;
-    server.send({ jobId: cm0.jobId, result: cm0.method } as MFJsonRpcReply)
+    server.send({ jobId: cm0.jobId, result: cm0.method })
     const cm1 = await server.nextMessage as MFJsonRpcAction;
-    server.send({ jobId: cm1.jobId, result: cm1.method } as MFJsonRpcReply)
+    server.send({ jobId: cm1.jobId, result: cm1.method })
 
     const sm0 = await res0
     expect(sm0).toMatchObject({ jobId: cm0.jobId, result: 'echo0' })
@@ -118,7 +122,8 @@ test('should make a successful call request with parameters', async () => {
     const server = new MockWS('ws://localhost:7357', { jsonProtocol: true })
     const client = new Rpc({ uri: 'ws://localhost:7357' })
 
-    const p = { s: 's', n: 1, a: ['a', 1], o: { p: 1 } }
+    interface ComplexType { s: string, n: number, a: (string | number)[], o: { [key:string]: number } }
+    const p: ComplexType = { s: 's', n: 1, a: ['a', 1], o: { p: 1 } }
     client.call('test', p)
 
     const m = await server.nextMessage;

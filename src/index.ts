@@ -90,7 +90,7 @@ export class Rpc {
 
     public send = (() => {
         let usedCustomIds = new Set<UUIDV4>();
-        return async (
+        return async <T>(
             type: "CALL" | "STREAM",
             method: string,
             opts: {
@@ -142,23 +142,23 @@ export class Rpc {
                 throw new ConnectionError(`could not connect to send msg = ${jsonMsg}, error: ${e}`)
             }
 
-            return new Promise<MFJsonRpcResponse>((resolve, reject) => {
+            return new Promise<MFJsonRpcResponse<T>>((resolve, reject) => {
                 this.inFlightRequests[requestId] = {
-                    resolve: payload => {
+                    resolve: (payload: MFJsonRpcResponse<T>) => {
                         delete this.inFlightRequests[requestId];
                         resolve(payload);
                     },
-                    reject: payload => {
+                    reject: (error: Error) => {
                         delete this.inFlightRequests[requestId];
-                        reject(payload);
+                        reject(error);
                     }
                 }
             });
         }
     })();
 
-    public call = (method: string, params: { [key: string]: JsonValue } = {}, options?: { headers?: { [key: string]: string } }) =>
-        this.send("CALL", method, { params, headers: options?.headers })
+    public call = <T>(method: string, params = {}, options?: { headers?: { [key: string]: string } }) =>
+        this.send<T>("CALL", method, { params, headers: options?.headers })
 
     public stream = async (
         method: string,
@@ -215,7 +215,7 @@ export class Rpc {
                         this.ws.onopen = () => {
                             currentConnectionPromise = undefined;
                             this.resubscribe();
-                            resolve(this.ws);
+                            resolve(this.ws!);
                         };
                         this.ws.onclose = () => {
                             this.ws?.close(1000, 'remote socket closed')
@@ -231,7 +231,7 @@ export class Rpc {
                     } else {
                         setTimeout(() => {
                             currentConnectionPromise = undefined;
-                            resolve(this.ws);
+                            resolve(this.ws!);
                         }, 0);
                     }
                 });
@@ -243,7 +243,7 @@ export class Rpc {
     private getMessageHandler = () => {
         return (event: MessageEvent) => {
             try {
-                const rawMessage = JSON.parse(event.data) as MFJsonRpcResponse;
+                const rawMessage = JSON.parse(event.data);
                 const batchedMessages = rawMessage instanceof Array ? rawMessage : [rawMessage];
                 batchedMessages.forEach(message => {
                     if (message.error) {
@@ -317,7 +317,7 @@ type RpcErrorCode = number;
 type JsonValue = string | number | null | { [key: string]: JsonValue } | JsonValue[]
 
 interface RequestResolver {
-    resolve: (payload: MFJsonRpcResponse) => void
+    resolve: (payload: MFJsonRpcResponse<any>) => void
     reject: (err: Error) => void
 }
 
@@ -346,11 +346,14 @@ interface MFJsonRpcError {
     message: string
     data?: JsonValue
 }
-export interface MFJsonRpcReply {
+
+// TODO @Typescript: all these <T> should really be <T extends JsonValue>.. but typescript does not support that
+
+export interface MFJsonRpcResponse<T> {
     // note @jonas: server implementation is missing `jsonrpc: '2.0'` param
 
-    jobId: "d2f9d3b9-ff76-4881-be45-573aa206418f",
-    result: JsonValue,
+    jobId: UUIDV4,
+    result: T,
 
     // note @jonas: server wsrpc implementation states that these should be equivalent to
     // HTTP headers, i.e. { [key:string]: string }, but then defines a map with type erased values
@@ -359,7 +362,6 @@ export interface MFJsonRpcReply {
 
     error: MFJsonRpcError
 }
-export type MFJsonRpcResponse = MFJsonRpcReply | MFJsonRpcReply[]
 
 export class ConnectionError extends Error {
     constructor(msg: string) {
