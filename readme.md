@@ -46,3 +46,13 @@ client.stream(
     { headers: { Authorization: authToken } }
 )
 ```
+
+### Typescript support
+
+Some methods have a template parameter to indicate the expected shape of e.g. a result:
+
+```Typescript
+interface ComplexType { s: string, n: number, nested: { a: (number | string)[] } }
+const complexResponse: MFJsonRpcResponse<ComplexType> = await client.call<ComplexType>('complex-method')
+const complexResult: ComplexType = complexResponse.result
+```
