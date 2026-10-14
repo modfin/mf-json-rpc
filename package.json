@@ -1,6 +1,6 @@
 {
   "name": "@modfin/mf-json-rpc",
-  "version": "0.0.12",
+  "version": "0.1.0",
   "description": "websocket implementation of json-rpc as used at modular finance",
   "main": "dist/index.js",
   "repository": {
